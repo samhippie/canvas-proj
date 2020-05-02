@@ -102,6 +102,7 @@ function conj(q) {
     return [s, -i, -j, -k];
 }
 
+/*
 function applyQuat(quat, point) {
     qlength = Math.sqrt(quat.reduce((a, b) => a + b*b));
     quat = quat.map(q => q / qlength);
@@ -113,6 +114,22 @@ function applyQuat(quat, point) {
     //console.log('transform', point, newpoint);
     return newpoint.reverse();
     //return newpoint;
+}
+*/
+
+function applyQuat2(quat1, quat2, point) {
+    const qlength1 = Math.sqrt(quat1.reduce((a, b) => a + b*b));
+    quat1 = quat1.map(q => q / qlength1);
+    qlength2 = Math.sqrt(quat2.reduce((a, b) => a + b*b));
+    quat2 = quat2.map(q => q / qlength2);
+    while (point.length < 4) {
+        point = [0, ...point];
+    }
+    const newpoint = ham(ham(quat1, point), quat2);
+    //const newpoint = ham(quat, point);
+
+    //just return x and y
+    return [newpoint[newpoint.length-1], newpoint[newpoint.length-2]];
 }
 
 
@@ -209,25 +226,37 @@ function updateCanvas(s, i, j, k) {
 }
 
 function main() {
-    const quatEls = [
-        document.getElementById('quat-s'),
-        document.getElementById('quat-i'),
-        document.getElementById('quat-j'),
-        document.getElementById('quat-k'),
+    const quat1Els = [
+        document.querySelector('#q1 #quat-s'),
+        document.querySelector('#q1 #quat-i'),
+        document.querySelector('#q1 #quat-j'),
+        document.querySelector('#q1 #quat-k'),
     ];
-    const quatValueEl = document.getElementById('quat-value');
+    const quat2Els = [
+        document.querySelector('#q2 #quat-s'),
+        document.querySelector('#q2 #quat-i'),
+        document.querySelector('#q2 #quat-j'),
+        document.querySelector('#q2 #quat-k'),
+    ];
+    const quat1ValueEl = document.getElementById('quat-1-value');
+    const quat2ValueEl = document.getElementById('quat-2-value');
     const onUpdate = () => {
-        const quat = quatEls.map(q => parseFloat(q.value));
-        const transformer = (p) => applyQuat(quat, p);
+        const quat1 = quat1Els.map(q => parseFloat(q.value));
+        const quat2 = quat2Els.map(q => parseFloat(q.value));
+        const transformer = (p) => applyQuat2(quat1, quat2, p);
         draw(transformer);
-        const [s, i, j, k] = quat.map(f => f.toFixed(3));
-        quatValueEl.innerText = `${s} + ${i}i + ${j}j + ${k}k`;
+        const [s1, i1, j1, k1] = quat1.map(f => f.toFixed(3));
+        quat1ValueEl.innerText = `${s1} + ${i1}i + ${j1}j + ${k1}k`;
+        const [s2, i2, j2, k2] = quat2.map(f => f.toFixed(3));
+        quat2ValueEl.innerText = `${s2} + ${i2}i + ${j2}j + ${k2}k`;
     }
     document.getElementById('reset').addEventListener('click', () => {
-        quatEls[0].value = 1;
-        quatEls.slice(1).forEach(q => q.value = 0);
+        quat1Els[0].value = 1;
+        quat1Els.slice(1).forEach(q => q.value = 0);
+        quat2Els[0].value = 1;
+        quat2Els.slice(1).forEach(q => q.value = 0);
         onUpdate();
-    })
-    quatEls.forEach(e => e.addEventListener('input', onUpdate));
+    });
+    [...quat1Els, ...quat2Els].forEach(e => e.addEventListener('input', onUpdate));
     onUpdate();
 }
