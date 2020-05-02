@@ -19,26 +19,38 @@ const faces4 = [0, 1, 2, 3].flatMap(i => [
     faces.flatMap(fs => fs.map(f => [...f.slice(0, i), -1, ...f.slice(i)])),
 ])
 
-const vertices = []
-for (let i = 0; i < 16; i++) {
-    const out = [];
-    for (let b = 0; b < 4; b++) {
-        out.push(i & (1 << b) !== 0 ? 1 : -1)
+/** @param {number} dimens 
+ * @returns {number[][][]}
+*/
+function getEdges(dimens) {
+    /** @type {number[][]} */
+    const vertices = []
+    for (let i = 0; i < (1 << dimens); i++) {
+        const out = [];
+        for (let b = 0; b < dimens; b++) {
+            out.push((i & (1 << b)) !== 0 ? 1 : -1)
+        }
+        vertices.push(out);
     }
-    vertices.push(out);
-}
 
-const edges = [];
-for (let i = 0; i < 16; i++) {
-    for (let b = 0; b < 4; b++) {
-        if (i & (1 << b) !== 0) {
-            edges.push([
-                vertices[i],
-                vertices[i & ~(1 << b)]
-            ]);
+    /** @type {number[][][]} */
+    const edges = [];
+    for (let i = 0; i < (1 << dimens); i++) {
+        for (let b = 0; b < dimens; b++) {
+            if ((i & (1 << b)) !== 0) {
+                edges.push([
+                    vertices[i],
+                    vertices[i & ~(1 << b)]
+                ]);
+            }
         }
     }
+    return edges;
 }
+
+const edges2 = getEdges(2);
+const edges3 = getEdges(3);
+const edges4 = getEdges(4);
 
 function test_edges()
 {
@@ -90,35 +102,48 @@ function conj(q) {
     return [s, -i, -j, -k];
 }
 
-function transform(quat, point) {
-    //console.log('quat1', quat);
-    qsum = quat.reduce((a, b) => a + b);
-    quat = quat.map(q => q / qsum);
-    //console.log('quat', quat);
-    if (point.length === 3) {
+function applyQuat(quat, point) {
+    qlength = Math.sqrt(quat.reduce((a, b) => a + b*b));
+    quat = quat.map(q => q / qlength);
+    while (point.length < 4) {
         point = [0, ...point];
     }
-    const newpoint = ham(ham(quat, point), conj(quat));
-    //console.log(point, quat, newpoint);
-    return newpoint.slice(1);
+    //const newpoint = ham(ham(quat, point), conj(quat));
+    const newpoint = ham(quat, point);
+    //console.log('transform', point, newpoint);
+    return newpoint.reverse();
+    //return newpoint;
 }
+
+
+/** @callback Transformation
+ * @param {number[]} vertex
+ * @returns {number[]}
+ */
+
 
 /** @param {CanvasRenderingContext2D} ctx
  *  @param {number[][]} matrix
+ *  @param {Transformation} transformer
     @param {number[][]} points */
-function renderPath(ctx, quat, points) {
+function renderPath(ctx, transformer, points) {
     if (points.length === 0) return;
-    ctx.strokeStyle = 'black';
     ctx.lineWidth = 0.01;
     ctx.beginPath();
-    ctx.moveTo(...transform(quat, points[0]))
+    //ctx.moveTo(...transform(quat, points[0]))
+    ctx.moveTo(...transformer(points[0]))
     for (const point of points.slice(1)) {
-        ctx.lineTo(...transform(quat, point));
+        //ctx.lineTo(...transform(quat, point));
+        ctx.lineTo(...transformer(point));
     }
     ctx.stroke();
 }
 
-function draw(quat) {
+/**
+ * 
+ * @param {Transformation} transformer 
+ */
+function draw(transformer) {
     /**@type {HTMLCanvasElement} */
     const c = document.getElementById('main');
     const ctx = c.getContext('2d');
@@ -127,8 +152,17 @@ function draw(quat) {
     ctx.save();
     ctx.scale(0.25 * c.width, 0.25 * c.height);
     ctx.translate(2, 2);
-    for (const face of faces4) {
-        renderPath(ctx, quat, face);
+    ctx.strokeStyle = 'blue';
+    for (const edge of edges4) {
+        renderPath(ctx, transformer, edge);
+    }
+    ctx.strokeStyle = 'red';
+    for (const edge of edges3) {
+        renderPath(ctx, transformer, edge);
+    }
+    ctx.strokeStyle = 'green';
+    for (const edge of edges2) {
+        renderPath(ctx, transformer, edge);
     }
     ctx.restore();
 }
@@ -181,11 +215,17 @@ function main() {
         document.getElementById('quat-j'),
         document.getElementById('quat-k'),
     ];
+    const quatValueEl = document.getElementById('quat-value');
     const onUpdate = () => {
-        draw(quatEls.map(q => parseFloat(q.value)));
+        const quat = quatEls.map(q => parseFloat(q.value));
+        const transformer = (p) => applyQuat(quat, p);
+        draw(transformer);
+        const [s, i, j, k] = quat.map(f => f.toFixed(3));
+        quatValueEl.innerText = `${s} + ${i}i + ${j}j + ${k}k`;
     }
     document.getElementById('reset').addEventListener('click', () => {
-        quatEls.forEach(q => q.value = 1);
+        quatEls[0].value = 1;
+        quatEls.slice(1).forEach(q => q.value = 0);
         onUpdate();
     })
     quatEls.forEach(e => e.addEventListener('input', onUpdate));
